@@ -14,7 +14,6 @@ use std::fmt::Display;
 use segment::types::{Filter, SearchParams, StrictModeConfig};
 
 use super::types::{CollectionError, CollectionResult};
-use super::universal_query::collection_query::Query;
 use crate::collection::Collection;
 
 // Creates a new `VerificationPass` without actually verifying anything.
@@ -294,50 +293,6 @@ impl StrictModeVerification for SearchParams {
     fn request_search_params(&self) -> Option<&SearchParams> {
         None
     }
-}
-
-/// Check that the query does not perform a fullscan based on the collection configuration.
-async fn check_fullscan(
-    query: &Query,
-    using: &str,
-    collection: &Collection,
-    strict_mode_config: &StrictModeConfig,
-) -> CollectionResult<()> {
-    // Check only applies on `unindexed_filtering_retrieve`
-    if strict_mode_config.unindexed_filtering_retrieve == Some(false) {
-        if let Query::Vector(_) = query {
-            let config = collection.collection_config.read().await;
-
-            // ignore sparse vectors
-            let query_targets_sparse = config
-                .params
-                .sparse_vectors
-                .as_ref()
-                .is_some_and(|sparse| sparse.contains_key(using));
-            if query_targets_sparse {
-                // sparse vectors are always indexed
-                return Ok(());
-            }
-
-            // check HNSW configuration for vector
-            let vector_hnsw_config = &config
-                .params
-                .vectors
-                .get_params(using)
-                .and_then(|param| param.hnsw_config);
-
-            let vector_hnsw_m = vector_hnsw_config.and_then(|hnsw| hnsw.m);
-            let vector_hnsw_payload_m = vector_hnsw_config.and_then(|hnsw| hnsw.payload_m);
-
-            if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
-                return Err(CollectionError::strict_mode(
-                    "Fullscan forbidden",
-                    "Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing",
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

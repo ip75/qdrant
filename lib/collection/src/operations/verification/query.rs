@@ -1,6 +1,6 @@
 use segment::types::StrictModeConfig;
 
-use super::{StrictModeVerification, check_fullscan};
+use super::StrictModeVerification;
 use crate::collection::Collection;
 use crate::operations::types::{CollectionError, CollectionResult};
 use crate::operations::universal_query::collection_query::{
@@ -35,6 +35,50 @@ impl Query {
         }
         Ok(())
     }
+
+    /// Check that the query does not perform a fullscan based on the collection configuration.
+    async fn check_fullscan(
+        &self,
+        using: &str,
+        collection: &Collection,
+        strict_mode_config: &StrictModeConfig,
+    ) -> CollectionResult<()> {
+        // Check only applies on `unindexed_filtering_retrieve`
+        if strict_mode_config.unindexed_filtering_retrieve == Some(false) {
+            if let Query::Vector(_) = &self {
+                let config = collection.collection_config.read().await;
+
+                // ignore sparse vectors
+                let query_targets_sparse = config
+                    .params
+                    .sparse_vectors
+                    .as_ref()
+                    .is_some_and(|sparse| sparse.contains_key(using));
+                if query_targets_sparse {
+                    // sparse vectors are always indexed
+                    return Ok(());
+                }
+
+                // check HNSW configuration for vector
+                let vector_hnsw_config = &config
+                    .params
+                    .vectors
+                    .get_params(using)
+                    .and_then(|param| param.hnsw_config);
+
+                let vector_hnsw_m = vector_hnsw_config.and_then(|hnsw| hnsw.m);
+                let vector_hnsw_payload_m = vector_hnsw_config.and_then(|hnsw| hnsw.payload_m);
+
+                if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
+                    return Err(CollectionError::strict_mode(
+                        format!("Fullscan forbidden on '{using}'"),
+                        "Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl StrictModeVerification for CollectionQueryRequest {
@@ -49,9 +93,11 @@ impl StrictModeVerification for CollectionQueryRequest {
         }
 
         if let Some(query) = self.query.as_ref() {
-            // check no fullscan only if there are no prefetches
+            // check query can perform fullscan when not rescoring
             if self.prefetch.is_empty() {
-                check_fullscan(query, &self.using, collection, strict_mode_config).await?;
+                query
+                    .check_fullscan(&self.using, collection, strict_mode_config)
+                    .await?;
             }
             // check for unindexed fields in formula
             query
@@ -95,8 +141,10 @@ impl StrictModeVerification for CollectionPrefetch {
         }
 
         if let Some(query) = self.query.as_ref() {
-            // check not a fullscan
-            check_fullscan(query, &self.using, collection, strict_mode_config).await?;
+            // check if prefetch can perform a fullscan
+            query
+                .check_fullscan(&self.using, collection, strict_mode_config)
+                .await?;
             // check for unindexed fields in formula
             query
                 .check_strict_mode(collection, strict_mode_config)

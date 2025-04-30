@@ -1861,4 +1861,58 @@ def test_strict_mode_full_scan(full_collection_name):
         }
     )
     assert not response.ok
-    assert "Fullscan forbidden. Help: Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing" in response.json()['status']['error']
+    assert "Fullscan forbidden on 'dense-multi'. Help: Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing" in response.json()['status']['error']
+
+    # sparse vector still works
+    response = request_with_validation(
+        api='/collections/{collection_name}/points/query',
+        method="POST",
+        path_params={'collection_name': collection_name},
+        body={
+            "query": 2,
+            "using": "sparse-text",
+            "limit": 5
+        }
+    )
+    assert response.ok
+
+    # Disabled HNSW is Ok for rescoring
+    response = request_with_validation(
+        api='/collections/{collection_name}/points/query',
+        method="POST",
+        path_params={'collection_name': collection_name},
+        body={
+            "prefetch": [
+                {
+                    "query": 2,
+                    "using": "sparse-text",
+                    "limit": 50
+                }
+            ],
+            "query": 2,
+            "using": "dense-multi",
+            "limit": 5
+        }
+    )
+    assert response.ok
+
+    # Disabled HNSW forbidden prefetch
+    response = request_with_validation(
+        api='/collections/{collection_name}/points/query',
+        method="POST",
+        path_params={'collection_name': collection_name},
+        body={
+            "prefetch": [
+                {
+                    "query": 2,
+                    "using": "dense-multi",
+                    "limit": 50
+                }
+            ],
+            "query": 2,
+            "using": "sparse-text",
+            "limit": 5
+        }
+    )
+    assert not response.ok
+    assert "Fullscan forbidden on 'dense-multi'. Help: Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing" in response.json()['status']['error']
