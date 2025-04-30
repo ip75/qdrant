@@ -72,7 +72,7 @@ impl Query {
                 if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
                     return Err(CollectionError::strict_mode(
                         format!("Fullscan forbidden on '{using}'"),
-                        "Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing",
+                        "Enable vector indexing or use a prefetch query before rescoring",
                     ));
                 }
             }
