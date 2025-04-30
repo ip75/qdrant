@@ -182,6 +182,12 @@ impl StrictModeVerification for CollectionQueryGroupsRequest {
         strict_mode_config: &StrictModeConfig,
     ) -> CollectionResult<()> {
         if let Some(query) = self.query.as_ref() {
+            // check query can perform fullscan when not rescoring
+            if self.prefetch.is_empty() {
+                query
+                    .check_fullscan(&self.using, collection, strict_mode_config)
+                    .await?;
+            }
             // check for unindexed fields in formula
             query
                 .check_strict_mode(collection, strict_mode_config)
