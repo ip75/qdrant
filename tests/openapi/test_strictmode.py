@@ -1809,3 +1809,56 @@ def test_read_rate_limiter_many_vectors(full_collection_name):
                              # + 1 of the filter for not including the id
     })
     check_multivector_query_id(should_succeed=True)
+
+def test_strict_mode_full_scan(full_collection_name):
+    collection_name = full_collection_name
+
+    # disable HNSW index
+    response = request_with_validation(
+        api='/collections/{collection_name}',
+        method="PATCH",
+        path_params={'collection_name': collection_name},
+        body={
+            "vectors": {
+                "dense-multi": {
+                    "hnsw_config": {
+                        "m": 0,
+                    },
+                },
+            }
+        }
+    )
+    assert response.ok
+
+    # full scan allowed
+    response = request_with_validation(
+        api='/collections/{collection_name}/points/query',
+        method="POST",
+        path_params={'collection_name': collection_name},
+        body={
+            "query": 2,
+            "using": "dense-multi",
+            "limit": 5
+        }
+    )
+    assert response.ok
+
+    # enable strict mode with unindexed_filtering_retrieve
+    set_strict_mode(collection_name, {
+        "enabled": True,
+        "unindexed_filtering_retrieve": False
+    })
+
+    # full scan not allowed
+    response = request_with_validation(
+        api='/collections/{collection_name}/points/query',
+        method="POST",
+        path_params={'collection_name': collection_name},
+        body={
+            "query": 2,
+            "using": "dense-multi",
+            "limit": 5
+        }
+    )
+    assert not response.ok
+    assert "Fullscan forbidden. Help: Change HNSW configuration 'm' or 'payload_m' to non zero to enable indexing" in response.json()['status']['error']

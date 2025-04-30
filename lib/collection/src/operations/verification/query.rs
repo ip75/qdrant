@@ -1,6 +1,6 @@
 use segment::types::StrictModeConfig;
 
-use super::StrictModeVerification;
+use super::{StrictModeVerification, check_fullscan};
 use crate::collection::Collection;
 use crate::operations::types::{CollectionError, CollectionResult};
 use crate::operations::universal_query::collection_query::{
@@ -8,7 +8,7 @@ use crate::operations::universal_query::collection_query::{
 };
 
 impl Query {
-    fn check_strict_mode(
+    async fn check_strict_mode(
         &self,
         collection: &Collection,
         strict_mode_config: &StrictModeConfig,
@@ -49,8 +49,14 @@ impl StrictModeVerification for CollectionQueryRequest {
         }
 
         if let Some(query) = self.query.as_ref() {
+            // check no fullscan only if there are no prefetches
+            if self.prefetch.is_empty() {
+                check_fullscan(query, &self.using, collection, strict_mode_config).await?;
+            }
             // check for unindexed fields in formula
-            query.check_strict_mode(collection, strict_mode_config)?
+            query
+                .check_strict_mode(collection, strict_mode_config)
+                .await?
         }
 
         Ok(())
@@ -89,8 +95,12 @@ impl StrictModeVerification for CollectionPrefetch {
         }
 
         if let Some(query) = self.query.as_ref() {
+            // check not a fullscan
+            check_fullscan(query, &self.using, collection, strict_mode_config).await?;
             // check for unindexed fields in formula
-            query.check_strict_mode(collection, strict_mode_config)?
+            query
+                .check_strict_mode(collection, strict_mode_config)
+                .await?
         }
 
         Ok(())
@@ -125,7 +135,9 @@ impl StrictModeVerification for CollectionQueryGroupsRequest {
     ) -> CollectionResult<()> {
         if let Some(query) = self.query.as_ref() {
             // check for unindexed fields in formula
-            query.check_strict_mode(collection, strict_mode_config)?
+            query
+                .check_strict_mode(collection, strict_mode_config)
+                .await?
         }
         Ok(())
     }
