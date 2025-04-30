@@ -64,14 +64,16 @@ impl Query {
                     .params
                     .vectors
                     .get_params(using)
-                    .and_then(|param| param.hnsw_config);
+                    .and_then(|param| param.hnsw_config.as_ref());
 
                 let vector_hnsw_m = vector_hnsw_config.and_then(|hnsw| hnsw.m);
                 let vector_hnsw_payload_m = vector_hnsw_config.and_then(|hnsw| hnsw.payload_m);
 
                 if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
                     return Err(CollectionError::strict_mode(
-                        format!("Fullscan forbidden on '{using}'"),
+                        format!(
+                            "Fullscan forbidden on '{using}' – vector indexing is disabled (m = 0 or payload_m = 0)"
+                        ),
                         "Enable vector indexing or use a prefetch query before rescoring",
                     ));
                 }
@@ -89,7 +91,9 @@ impl StrictModeVerification for CollectionQueryRequest {
     ) -> CollectionResult<()> {
         // CollectionPrefetch.prefetch is of type CollectionPrefetch (recursive type)
         for prefetch in &self.prefetch {
-            Box::pin(prefetch.check_strict_mode(collection, strict_mode_config)).await?;
+            prefetch
+                .check_strict_mode(collection, strict_mode_config)
+                .await?;
         }
 
         if let Some(query) = self.query.as_ref() {
