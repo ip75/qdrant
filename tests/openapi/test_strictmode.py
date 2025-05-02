@@ -1843,10 +1843,10 @@ def test_strict_mode_full_scan(full_collection_name):
     )
     assert response.ok
 
-    # enable strict mode with unindexed_filtering_retrieve
+    # enable strict mode with search_allow_exact
     set_strict_mode(collection_name, {
         "enabled": True,
-        "unindexed_filtering_retrieve": False
+        "search_allow_exact": False
     })
 
     # full scan not allowed

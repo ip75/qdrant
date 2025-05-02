@@ -43,8 +43,8 @@ impl Query {
         collection: &Collection,
         strict_mode_config: &StrictModeConfig,
     ) -> CollectionResult<()> {
-        // Check only applies on `unindexed_filtering_retrieve`
-        if strict_mode_config.unindexed_filtering_retrieve == Some(false) {
+        // Check only applies on `search_allow_exact`
+        if strict_mode_config.search_allow_exact == Some(false) {
             if let Query::Vector(_) = &self {
                 let config = collection.collection_config.read().await;
 
