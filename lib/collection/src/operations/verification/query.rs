@@ -45,37 +45,40 @@ impl Query {
     ) -> CollectionResult<()> {
         // Check only applies on `search_allow_exact`
         if strict_mode_config.search_allow_exact == Some(false) {
-            if let Query::Vector(_) = &self {
-                let config = collection.collection_config.read().await;
+            match &self {
+                Query::Fusion(_) | Query::OrderBy(_) | Query::Formula(_) | Query::Sample(_) => (),
+                Query::Vector(_) => {
+                    let config = collection.collection_config.read().await;
 
-                // ignore sparse vectors
-                let query_targets_sparse = config
-                    .params
-                    .sparse_vectors
-                    .as_ref()
-                    .is_some_and(|sparse| sparse.contains_key(using));
-                if query_targets_sparse {
-                    // sparse vectors are always indexed
-                    return Ok(());
-                }
+                    // ignore sparse vectors
+                    let query_targets_sparse = config
+                        .params
+                        .sparse_vectors
+                        .as_ref()
+                        .is_some_and(|sparse| sparse.contains_key(using));
+                    if query_targets_sparse {
+                        // sparse vectors are always indexed
+                        return Ok(());
+                    }
 
-                // check HNSW configuration for vector
-                let vector_hnsw_config = &config
-                    .params
-                    .vectors
-                    .get_params(using)
-                    .and_then(|param| param.hnsw_config.as_ref());
+                    // check HNSW configuration for vector
+                    let vector_hnsw_config = &config
+                        .params
+                        .vectors
+                        .get_params(using)
+                        .and_then(|param| param.hnsw_config.as_ref());
 
-                let vector_hnsw_m = vector_hnsw_config.and_then(|hnsw| hnsw.m);
-                let vector_hnsw_payload_m = vector_hnsw_config.and_then(|hnsw| hnsw.payload_m);
+                    let vector_hnsw_m = vector_hnsw_config.and_then(|hnsw| hnsw.m);
+                    let vector_hnsw_payload_m = vector_hnsw_config.and_then(|hnsw| hnsw.payload_m);
 
-                if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
-                    return Err(CollectionError::strict_mode(
-                        format!(
-                            "Fullscan forbidden on '{using}' – vector indexing is disabled (m = 0 or payload_m = 0)"
-                        ),
-                        "Enable vector indexing or use a prefetch query before rescoring",
-                    ));
+                    if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
+                        return Err(CollectionError::strict_mode(
+                            format!(
+                                "Fullscan forbidden on '{using}' – vector indexing is disabled (m = 0 or payload_m = 0)"
+                            ),
+                            "Enable vector indexing or use a prefetch query before rescoring",
+                        ));
+                    }
                 }
             }
         }
