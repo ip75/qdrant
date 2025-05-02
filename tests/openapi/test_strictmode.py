@@ -1861,7 +1861,7 @@ def test_strict_mode_full_scan(full_collection_name):
         }
     )
     assert not response.ok
-    assert "Fullscan forbidden on 'dense-multi' – vector indexing is disabled (m = 0 or payload_m = 0). Help: Enable vector indexing or use a prefetch query before rescoring" in response.json()['status']['error']
+    assert "Fullscan forbidden on 'dense-multi' – vector indexing is disabled (hnsw_config.m = 0). Help: Enable vector indexing or use a prefetch query before rescoring" in response.json()['status']['error']
 
     # sparse vector still works
     response = request_with_validation(
@@ -1915,4 +1915,4 @@ def test_strict_mode_full_scan(full_collection_name):
         }
     )
     assert not response.ok
-    assert "Fullscan forbidden on 'dense-multi' – vector indexing is disabled (m = 0 or payload_m = 0). Help: Enable vector indexing or use a prefetch query before rescoring" in response.json()['status']['error']
+    assert "Fullscan forbidden on 'dense-multi' – vector indexing is disabled (hnsw_config.m = 0). Help: Enable vector indexing or use a prefetch query before rescoring" in response.json()['status']['error']

@@ -69,12 +69,11 @@ impl Query {
                         .and_then(|param| param.hnsw_config.as_ref());
 
                     let vector_hnsw_m = vector_hnsw_config.and_then(|hnsw| hnsw.m);
-                    let vector_hnsw_payload_m = vector_hnsw_config.and_then(|hnsw| hnsw.payload_m);
-
-                    if vector_hnsw_m == Some(0) || vector_hnsw_payload_m == Some(0) {
+                    // TODO(strict-mode) check also payload_m if if there is a filter by tenant/principal
+                    if vector_hnsw_m == Some(0) {
                         return Err(CollectionError::strict_mode(
                             format!(
-                                "Fullscan forbidden on '{using}' – vector indexing is disabled (m = 0 or payload_m = 0)"
+                                "Fullscan forbidden on '{using}' – vector indexing is disabled (hnsw_config.m = 0)"
                             ),
                             "Enable vector indexing or use a prefetch query before rescoring",
                         ));
